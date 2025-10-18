@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-10-08 12:23:05.934643",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item",
+  "rate",
+  "batches",
+  "amount",
+  "column_break_umgf",
+  "qty_in_rolls",
+  "qty_in_kgs",
+  "warehouse",
+  "batch_item_code"
+ ],
+ "fields": [
+  {
+   "fieldname": "qty_in_rolls",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Qty In Rolls"
+  },
+  {
+   "fieldname": "qty_in_kgs",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty In Kgs"
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Rate"
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Small Text",
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "batches",
+   "fieldtype": "Small Text",
+   "label": "Batches"
+  },
+  {
+   "fieldname": "column_break_umgf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "batch_item_code",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Batch Item Code"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-10-09 15:18:05.855054",
+ "modified_by": "Administrator",
+ "module": "Gateway",
+ "name": "Multiple Batch Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
