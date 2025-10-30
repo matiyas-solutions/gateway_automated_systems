@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import flt
 
 @frappe.whitelist()
 def get_batch_details(item_code):
@@ -102,3 +103,49 @@ def get_markup(sales_order, item_code, markp):
         return round(avg_markup, 2)
 
     return 0
+
+@frappe.whitelist()
+def update_price_list(doc, method):
+    price_lists = [
+        "Retail Markup",
+        "Wholesale Markup",
+        "Distributor Markup",
+        "Markup Price 4",
+        "Markup Price 3"
+    ]
+
+    for item in doc.items:
+        base_rate = flt(item.rate)
+
+        markup_rules = {
+            "Retail Markup": doc.custom_retail_markup_,      
+            "Wholesale Markup": doc.custom_wholesale_markup_,   
+            "Distributor Markup": doc.custom_distributor_markup_,   
+            "Markup Price 4": doc.custom_markup_price_4,      
+            "Markup Price 3": doc.custom_markup_price_3       
+        }
+
+        for price_list in price_lists:
+            new_rate = base_rate * markup_rules[price_list]
+
+            if new_rate <= 0:
+                continue
+
+            existing_price = frappe.db.exists("Item Price", {
+                "item_code": item.item_code,
+                "price_list": price_list
+            })
+
+            if existing_price:
+                frappe.db.set_value("Item Price", existing_price, "price_list_rate", new_rate)
+            else:
+                price_doc = frappe.get_doc({
+                    "doctype": "Item Price",
+                    "price_list": price_list,
+                    "item_code": item.item_code,
+                    "price_list_rate": new_rate,
+                    "currency": doc.currency or "INR",
+                    "selling": 1,
+                    "buying": 1
+                })
+                price_doc.insert(ignore_permissions=True)

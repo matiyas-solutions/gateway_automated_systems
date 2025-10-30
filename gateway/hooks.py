@@ -146,7 +146,11 @@ doctype_js = {"Delivery Note" : "public/js/delivery_note.js",
 # 		"on_trash": "method"
 # 	}
 # }
-
+doc_events = {
+    "Purchase Receipt": {
+        "on_submit": "gateway.api.update_price_list"
+    }
+}
 # Scheduled Tasks
 # ---------------
 
