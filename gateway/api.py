@@ -126,8 +126,7 @@ def update_price_list(doc, method):
         }
 
         for price_list in price_lists:
-            new_rate = base_rate * markup_rules[price_list]
-
+            new_rate = base_rate + (base_rate * markup_rules[price_list])
             if new_rate <= 0:
                 continue
 
