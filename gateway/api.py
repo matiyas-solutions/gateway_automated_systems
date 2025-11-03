@@ -13,7 +13,8 @@ def get_batch_details(item_code):
             "type_of_transaction": "Inward",
             "has_batch_no": 1
         },
-        pluck="name"
+        pluck="name",
+        order_by="creation asc"
     )
 
     if not parent_names:
@@ -26,7 +27,8 @@ def get_batch_details(item_code):
             "parent": ["in", parent_names],
             "qty": [">", 0]
         },
-        fields=["batch_no", "qty", "warehouse"]
+        fields=["batch_no", "qty", "warehouse", "creation"],
+        order_by="creation asc"
     )
 
     # Step 3: Include only batches that exist and have batch_qty > 0
@@ -41,6 +43,28 @@ def get_batch_details(item_code):
 
     return results
 
+@frappe.whitelist()
+def set_item_batch_details(item, selected_batches, doc):
+    import json
+
+    if isinstance(selected_batches, str):
+        selected_batches = json.loads(selected_batches)
+    if isinstance(doc, str):
+        doc = json.loads(doc)
+
+    # Prepare items list to return
+    items = []
+
+    for batch in selected_batches:
+        items.append({
+            "item_code": item or batch.get("item_code"),
+            "batch_no": batch.get("batch_no"),
+            "warehouse": batch.get("warehouse"),
+            "qty": batch.get("qty")
+        })
+
+    # Return items list to be added client-side
+    return {"items": items}
 
 
 @frappe.whitelist()
@@ -55,11 +79,10 @@ def get_markup(sales_order, item_code, markp):
 
     # Map markup labels to fieldnames
     markup_field_map = {
-        "Retail Markup": "custom_retail_markup_",
-        "Wholesale Markup": "custom_wholesale_markup_",
-        "Distributor Markup": "custom_distributor_markup_",
-        "Markup Price 3": "custom_markup_price_3",
-        "Markup Price 4": "custom_markup_price_4"
+        "Retail Price": "custom_retail_price",
+        "Wholesale Price": "custom_wholesale_price",
+        "Market Square": "custom_market_square",
+        "General Sales Price": "custom_general_sales_price",
     }
 
     fieldname = markup_field_map.get(markp)

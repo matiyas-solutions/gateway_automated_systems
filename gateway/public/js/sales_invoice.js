@@ -1,5 +1,7 @@
 frappe.ui.form.on("Sales Invoice", {
-
+    onload: function(frm) {
+        frm.fields_dict['items'].grid.grid_pagination.page_length = 500; 
+    },
     custom_get_batch_item: function(frm) {
         console.log("Custom Button Clicked");
 
