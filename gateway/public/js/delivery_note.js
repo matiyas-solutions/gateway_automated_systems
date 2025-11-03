@@ -363,20 +363,17 @@ frappe.ui.form.on('Multiple Batch Item', {
         }
 
         frappe.call({
-            method: "gateway.api.get_batch_details",  // Replace with your actual method path
+            method: "gateway.api.get_batch_details",
             args: { item_code: row.item },
             callback: function(r) {
-                if (!r.message || r.message.length === 0) {
-                    return;
-                }
+                if (!r.message || r.message.length === 0) return;
 
                 let table_data = r.message
                     .filter(entry => entry.qty > 0)
                     .map(entry => ({
                         batch_no: entry.batch_no,
                         warehouse: entry.warehouse,
-                        qty: entry.qty,
-                        batch_item_code: frappe.utils.get_random(10)
+                        qty: entry.qty
                     }));
 
                 if (table_data.length === 0) {
@@ -385,129 +382,142 @@ frappe.ui.form.on('Multiple Batch Item', {
                 }
 
                 let d = new frappe.ui.Dialog({
-            title: __('Available Batches for {0}', [row.item]),
-            size: 'large',
-            fields: [
-                {
-                    fieldname: 'search_batch',
-                    fieldtype: 'Data',
-                    label: 'Search Batch / Qty',
-                    reqd: 0,
-                    onchange: function() {
-                        apply_filters();
-                    }
-                },
-                {
-                    fieldname: 'column_break',
-                    fieldtype: "Column Break",
-                },
-                {
-                    fieldname: 'filter_warehouse',
-                    fieldtype: 'Select',
-                    label: 'Filter by Warehouse',
-                    options: ['All'].concat([...new Set(table_data.map(r => r.warehouse))]),
-                    default: 'All',
-                    onchange: function() {
-                        apply_filters();
-                    }
-                },
-                {
-                    fieldname: 'section_break',
-                    fieldtype: "Section Break",
-                },
-                {
-                    fieldname: 'batch_table',
-                    fieldtype: 'Table',
-                    label: 'Available Batches (Click rows to select)',
-                    cannot_add_rows: true,
-                    in_place_edit: false,
+                    title: __('Available Batches for {0}', [row.item]),
+                    size: 'large',
                     fields: [
-                        { fieldname: 'batch_no', fieldtype: 'Data', label: 'Batch No', read_only: 1, in_list_view: 1 },
-                        { fieldname: 'warehouse', fieldtype: 'Data', label: 'Warehouse', read_only: 1, in_list_view: 1 },
-                        { fieldname: 'qty', fieldtype: 'Float', label: 'Qty KGs', in_list_view: 1 },
-                        { fieldname: 'batch_item_code', fieldtype: 'Data', label: 'Batch Item Code', read_only: 1, hidden: 1 },
                         {
-                            fieldname: 'kgs_option',
+                            fieldname: 'search_batch',
+                            fieldtype: 'Data',
+                            label: 'Search Batch / Qty',
+                            onchange: function () {
+                                apply_filters();
+                            }
+                        },
+                        {
+                            fieldname: 'column_break',
+                            fieldtype: "Column Break"
+                        },
+                        {
+                            fieldname: 'filter_warehouse',
                             fieldtype: 'Select',
-                            label: 'KGs',
-                            in_list_view: 1,
-                            options: [
-                                '65.1', '65.2', '65.3',
-                                '70.1', '70.2', '70.3',
-                                '72.3', '72.5', '72.6',
-                                '80.1', '80.2', '80.3',
-                                '90.1', '90.2', '90.3', '90.5'
-                            ].join('\n')
+                            label: 'Filter by Warehouse',
+                            options: ['All'].concat([...new Set(table_data.map(r => r.warehouse))]),
+                            default: 'All',
+                            onchange: function () {
+                                apply_filters();
+                            }
+                        },
+                        {
+                            fieldname: 'section_break',
+                            fieldtype: "Section Break"
+                        },
+                        {
+                            fieldname: 'batch_table',
+                            fieldtype: 'Table',
+                            label: 'Available Batches (Click rows to select)',
+                            cannot_add_rows: true,
+                            in_place_edit: false,
+                            fields: [
+                                { fieldname: 'batch_no', fieldtype: 'Data', label: 'Batch No', read_only: 1, in_list_view: 1 },
+                                { fieldname: 'warehouse', fieldtype: 'Data', label: 'Warehouse', read_only: 1, in_list_view: 1 },
+                                { fieldname: 'qty', fieldtype: 'Float', label: 'Qty (KGs)', in_list_view: 1 },
+                                {
+                                    fieldname: 'kgs_option',
+                                    fieldtype: 'Select',
+                                    label: 'KGs',
+                                    in_list_view: 1,
+                                    options: [
+                                        '65.1', '65.2', '65.3',
+                                        '70.1', '70.2', '70.3',
+                                        '72.3', '72.5', '72.6',
+                                        '80.1', '80.2', '80.3',
+                                        '90.1', '90.2', '90.3', '90.5'
+                                    ].join('\n')
+                                }
+                            ],
+                            data: table_data
                         }
                     ],
-                    data: table_data
-                }
-            ],
-            primary_action_label: __('Add Selected Batches'),
-            primary_action(values) {
-                let selected_batches = d.selected_batches || [];
+                    primary_action_label: __('Add Selected Batches'),
+                    primary_action(values) {
+                    let grid = d.fields_dict.batch_table.grid;
 
-                if (selected_batches.length === 0) {
-                    frappe.msgprint(__('Please click on rows to select batches first.'));
-                    return;
-                }
+                    // ✅ Convert row names ("row 5") → actual data objects
+                    let selected_row_names = grid.get_selected(); // ["row 5", "row 7"]
+                    let selected_batches = grid.data.filter(r =>
+                        selected_row_names.includes(r.name)
+                    );
 
-                let total_qty = selected_batches.reduce((sum, batch) => sum + (batch.qty || 0), 0);
-                let qty_in_rolls = selected_batches.length;
-                let batch_nos = selected_batches.map(batch => batch.batch_no).join('\n');
-                let warehouses = selected_batches.map(batch => batch.warehouse).join('\n');
+                    if (selected_batches.length === 0) {
+                        frappe.msgprint(__('Please click on rows to select batches first.'));
+                        return;
+                    }
 
-                frappe.model.set_value(cdt, cdn, 'qty_in_kgs', total_qty);
-                frappe.model.set_value(cdt, cdn, 'qty_in_rolls', qty_in_rolls);
-                frappe.model.set_value(cdt, cdn, 'batches', batch_nos);
-                frappe.model.set_value(cdt, cdn, 'warehouse', warehouses);
+                    // ✅ Calculate totals
+                    let total_qty = selected_batches.reduce((sum, batch) => sum + (parseFloat(batch.qty) || 0), 0);
+                    let qty_in_rolls = selected_batches.length;
+                    let batch_nos = selected_batches.map(batch => batch.batch_no).join('\n');
+                    let warehouses = [...new Set(selected_batches.map(batch => batch.warehouse))].join('\n');
 
-                frm.refresh_field('custom_multiple_batch_items');
+                    frappe.model.set_value(cdt, cdn, 'qty_in_kgs', total_qty);
+                    frappe.model.set_value(cdt, cdn, 'qty_in_rolls', qty_in_rolls);
+                    frappe.model.set_value(cdt, cdn, 'batches', batch_nos);
+                    frappe.model.set_value(cdt, cdn, 'warehouse', warehouses);
 
-                selected_batches.forEach(r => {
-                    let dn_child = frm.add_child('items');
-                    frappe.model.set_value(dn_child.doctype, dn_child.name, 'item_code', row.item);
-                    frappe.model.set_value(dn_child.doctype, dn_child.name, 'warehouse', r.warehouse);
-                    frappe.model.set_value(dn_child.doctype, dn_child.name, 'batch_no', r.batch_no);
-                    frappe.model.set_value(dn_child.doctype, dn_child.name, 'qty', r.qty);
+                    frm.refresh_field('custom_multiple_batch_items');
+                    selected_batches.forEach(item => {
+                        let r = frm.add_child('items');
+                        frappe.model.set_value(r.doctype, r.name, 'item_code', row.item);
+                        frappe.model.set_value(r.doctype, r.name, 'batch_no', item.batch_no);
+                        frappe.model.set_value(r.doctype, r.name, 'warehouse', item.warehouse);
+                        frappe.model.set_value(r.doctype, r.name, 'qty', item.qty);
+                    });
+
+                    frm.refresh_field('items');
+                    d.hide();
+                    }
                 });
 
-                frm.refresh_field('items');
-                d.hide();
-            }
-            });
+                d.selected_batches = [];
 
-            // ✅ Handle row clicks for selection
-            d.$wrapper.on('click', '.grid-row', function() {
-                let idx = $(this).attr('data-idx');
-                let row = d.get_value('batch_table')[idx - 1];
-                if (!d.selected_batches) d.selected_batches = [];
+                // Handle row click event
+                d.$wrapper.on('click', '.grid-row', function() {
+                    const idx = parseInt($(this).attr('data-idx'));
+                    const row = d.fields_dict.batch_table.grid.data[idx - 1];
 
-                if ($(this).hasClass('row-selected')) {
-                    // unselect
-                    $(this).removeClass('row-selected');
-                    d.selected_batches = d.selected_batches.filter(b => b.batch_no !== row.batch_no);
-                } else {
-                    // select
-                    $(this).addClass('row-selected');
-                    d.selected_batches.push(row);
-                }
-            });
+                    if (!row) return;
 
-            // 🔍 Filter function
-            function apply_filters() {
-                const search = (d.get_value('search_batch') || '').toLowerCase();
-                const warehouse_filter = d.get_value('filter_warehouse');
+                    // Toggle selection manually
+                    let selected_rows = d.fields_dict.batch_table.grid.get_selected();
+                    if (selected_rows.includes(row)) {
+                        // already selected → unselect
+                        d.fields_dict.batch_table.grid.unselect_row(row);
+                    } else {
+                        d.fields_dict.batch_table.grid.select_row(row);
+                    }
+                });
 
-                const filtered = table_data.filter(row => {
-                    const matchSearch =
-                        !search ||
-                        row.batch_no.toLowerCase().includes(search) ||
-                        String(row.qty).toLowerCase().includes(search);
-                    const matchWarehouse =
-                        warehouse_filter === 'All' || row.warehouse === warehouse_filter;
+                // 🔍 Apply filters (maintains selected rows)
+                function apply_filters() {
+                    const search = (d.get_value('search_batch') || '').toLowerCase();
+                    const warehouse_filter = d.get_value('filter_warehouse');
+                    const selected_before = d.fields_dict.batch_table.grid.get_selected().map(r => r.batch_no);
 
+                    const filtered = table_data.filter(row => {
+                        const matchSearch =
+                            !search ||
+                            row.batch_no.toLowerCase().includes(search) ||
+                            String(row.qty).toLowerCase().includes(search);
+                        const matchWarehouse =
+                            warehouse_filter === 'All' || row.warehouse === warehouse_filter;
                         return matchSearch && matchWarehouse;
+                    });
+
+                    // Restore previous selections
+                    filtered.forEach(row => {
+                        if (selected_before.includes(row.batch_no)) {
+                            row.__checked = true;
+                        }
                     });
 
                     d.fields_dict.batch_table.grid.df.data = filtered;
@@ -515,7 +525,6 @@ frappe.ui.form.on('Multiple Batch Item', {
                 }
 
                 d.show();
-
             }
         });
     },
