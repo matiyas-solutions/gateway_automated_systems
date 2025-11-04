@@ -130,22 +130,20 @@ def get_markup(sales_order, item_code, markp):
 @frappe.whitelist()
 def update_price_list(doc, method):
     price_lists = [
-        "Retail Markup",
-        "Wholesale Markup",
-        "Distributor Markup",
-        "Markup Price 4",
-        "Markup Price 3"
+        "Retail Price",
+        "Wholesale Price",
+        "Market Square",
+        "General Sales Price"
     ]
 
     for item in doc.items:
         base_rate = flt(item.rate)
 
-        markup_rules = {
-            "Retail Markup": doc.custom_retail_markup_,      
-            "Wholesale Markup": doc.custom_wholesale_markup_,   
-            "Distributor Markup": doc.custom_distributor_markup_,   
-            "Markup Price 4": doc.custom_markup_price_4,      
-            "Markup Price 3": doc.custom_markup_price_3       
+         markup_field_map = {
+            "Retail Price": doc.custom_retail_price,
+            "Wholesale Price": doc.custom_wholesale_price,
+            "Market Square": doc.custom_market_square,
+            "General Sales Price": doc.custom_general_sales_price,
         }
 
         for price_list in price_lists:
