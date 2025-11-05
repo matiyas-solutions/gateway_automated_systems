@@ -139,7 +139,7 @@ def update_price_list(doc, method):
     for item in doc.items:
         base_rate = flt(item.rate)
 
-        markup_field_map = {
+        markup_rules = {
             "Retail Price": doc.custom_retail_price,
             "Wholesale Price": doc.custom_wholesale_price,
             "Market Square": doc.custom_market_square,
@@ -147,25 +147,26 @@ def update_price_list(doc, method):
         }
 
         for price_list in price_lists:
-            new_rate = base_rate + (base_rate * markup_rules[price_list])
-            if new_rate <= 0:
-                continue
+            if frappe.db.exists("Price List",price_list):
+                new_rate = base_rate + ((base_rate * markup_rules[price_list]) / 100)
+                if new_rate <= 0:
+                    continue
 
-            existing_price = frappe.db.exists("Item Price", {
-                "item_code": item.item_code,
-                "price_list": price_list
-            })
-
-            if existing_price:
-                frappe.db.set_value("Item Price", existing_price, "price_list_rate", new_rate)
-            else:
-                price_doc = frappe.get_doc({
-                    "doctype": "Item Price",
-                    "price_list": price_list,
+                existing_price = frappe.db.exists("Item Price", {
                     "item_code": item.item_code,
-                    "price_list_rate": new_rate,
-                    "currency": doc.currency or "INR",
-                    "selling": 1,
-                    "buying": 1
+                    "price_list": price_list
                 })
-                price_doc.insert(ignore_permissions=True)
+
+                if existing_price:
+                    frappe.db.set_value("Item Price", existing_price, "price_list_rate", new_rate)
+                else:
+                    price_doc = frappe.get_doc({
+                        "doctype": "Item Price",
+                        "price_list": price_list,
+                        "item_code": item.item_code,
+                        "price_list_rate": new_rate,
+                        "currency": doc.currency or "INR",
+                        "selling": 1,
+                        "buying": 1
+                    })
+                    price_doc.insert(ignore_permissions=True)
