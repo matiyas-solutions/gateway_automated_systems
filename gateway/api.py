@@ -139,7 +139,7 @@ def update_price_list(doc, method):
     for item in doc.items:
         base_rate = flt(item.rate)
 
-         markup_field_map = {
+        markup_field_map = {
             "Retail Price": doc.custom_retail_price,
             "Wholesale Price": doc.custom_wholesale_price,
             "Market Square": doc.custom_market_square,
