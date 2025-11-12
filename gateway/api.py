@@ -146,9 +146,16 @@ def update_price_list(doc, method):
             "General Sales Price": doc.custom_general_sales_price,
         }
 
+        float_precision = cint(frappe.db.get_single_value("System Settings", "float_precision") or 2)
         for price_list in price_lists:
             if frappe.db.exists("Price List",price_list):
-                new_rate = base_rate + ((base_rate * markup_rules[price_list]) / 100)
+                if item.conversion_factor:
+                    new_rate = item.stock_uom_rate + ((item.stock_uom_rate * markup_rules[price_list]) / 100)
+                else:
+                    new_rate = base_rate + ((base_rate * markup_rules[price_list]) / 100)
+                
+                new_rate = round(new_rate, float_precision)
+                    
                 if new_rate <= 0:
                     continue
 
@@ -166,7 +173,6 @@ def update_price_list(doc, method):
                         "item_code": item.item_code,
                         "price_list_rate": new_rate,
                         "currency": doc.currency or "INR",
-                        "selling": 1,
-                        "buying": 1
+                        "selling": 1
                     })
                     price_doc.insert(ignore_permissions=True)
