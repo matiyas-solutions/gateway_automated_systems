@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import flt
+from frappe.utils import flt, cint
 
 @frappe.whitelist()
 def get_batch_details(item_code):
