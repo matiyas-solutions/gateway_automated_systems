@@ -366,19 +366,36 @@ frappe.ui.form.on('Multiple Batch Item', {
             method: "gateway.api.get_batch_details",
             args: { item_code: row.item },
             callback: function(r) {
+
                 if (!r.message || r.message.length === 0) return;
 
-                let table_data = r.message
+                // master dataset that lives independently of the grid view
+                let master_table_data = r.message
                     .filter(entry => entry.qty > 0)
                     .map(entry => ({
+                        name: frappe.utils.get_random(8),
                         batch_no: entry.batch_no,
                         warehouse: entry.warehouse,
-                        qty: entry.qty
+                        qty: entry.qty,
+                        // selected flag lives in master
+                        selected: false
                     }));
 
-                if (table_data.length === 0) {
+                if (master_table_data.length === 0) {
                     frappe.msgprint(__('No available stock found for this item.'));
                     return;
+                }
+
+                // inject small CSS to show highlight for selected rows
+                const styleId = 'selected-row-style';
+                if (!document.getElementById(styleId)) {
+                    const style = document.createElement('style');
+                    style.id = styleId;
+                    style.innerHTML = `
+                        .my-selected-row { background: rgba(100, 180, 255, 0.12) !important; }
+                        .my-selected-row .grid-row-data { font-weight: 600; }
+                    `;
+                    document.head.appendChild(style);
                 }
 
                 let d = new frappe.ui.Dialog({
@@ -393,24 +410,18 @@ frappe.ui.form.on('Multiple Batch Item', {
                                 apply_filters();
                             }
                         },
-                        {
-                            fieldname: 'column_break',
-                            fieldtype: "Column Break"
-                        },
+                        { fieldname: 'column_break', fieldtype: "Column Break" },
                         {
                             fieldname: 'filter_warehouse',
                             fieldtype: 'Select',
                             label: 'Filter by Warehouse',
-                            options: ['All'].concat([...new Set(table_data.map(r => r.warehouse))]),
+                            options: ['All'].concat([...new Set(master_table_data.map(r => r.warehouse))]),
                             default: 'All',
                             onchange: function () {
                                 apply_filters();
                             }
                         },
-                        {
-                            fieldname: 'section_break',
-                            fieldtype: "Section Break"
-                        },
+                        { fieldname: 'section_break', fieldtype: "Section Break" },
                         {
                             fieldname: 'batch_table',
                             fieldtype: 'Table',
@@ -420,109 +431,179 @@ frappe.ui.form.on('Multiple Batch Item', {
                             fields: [
                                 { fieldname: 'batch_no', fieldtype: 'Data', label: 'Batch No', read_only: 1, in_list_view: 1 },
                                 { fieldname: 'warehouse', fieldtype: 'Data', label: 'Warehouse', read_only: 1, in_list_view: 1 },
-                                { fieldname: 'qty', fieldtype: 'Float', label: 'Qty (KGs)', in_list_view: 1 },
-                                {
-                                    fieldname: 'kgs_option',
-                                    fieldtype: 'Select',
-                                    label: 'KGs',
-                                    in_list_view: 1,
-                                    options: [
-                                        '65.1', '65.2', '65.3',
-                                        '70.1', '70.2', '70.3',
-                                        '72.3', '72.5', '72.6',
-                                        '80.1', '80.2', '80.3',
-                                        '90.1', '90.2', '90.3', '90.5'
-                                    ].join('\n')
-                                }
+                                { fieldname: 'qty', fieldtype: 'Float', label: 'Qty (KGs)', in_list_view: 1 }
                             ],
-                            data: table_data
+                            data: [] // populated by apply_filters()
                         }
                     ],
                     primary_action_label: __('Add Selected Batches'),
                     primary_action(values) {
-                    let grid = d.fields_dict.batch_table.grid;
+                        // collect selected master rows
+                        let selected_batches = master_table_data.filter(m => m.selected);
 
-                    // ✅ Convert row names ("row 5") → actual data objects
-                    let selected_row_names = grid.get_selected(); // ["row 5", "row 7"]
-                    let selected_batches = grid.data.filter(r =>
-                        selected_row_names.includes(r.name)
-                    );
+                        if (selected_batches.length === 0) {
+                            frappe.msgprint(__('Please select batches first.'));
+                            return;
+                        }
 
-                    if (selected_batches.length === 0) {
-                        frappe.msgprint(__('Please click on rows to select batches first.'));
-                        return;
-                    }
+                        // Calculate totals
+                        let total_qty = selected_batches.reduce((sum, b) => sum + (parseFloat(b.qty) || 0), 0);
+                        let qty_in_rolls = selected_batches.length;
+                        let batch_nos = selected_batches.map(b => b.batch_no).join('\n');
+                        let warehouses = [...new Set(selected_batches.map(b => b.warehouse))].join('\n');
 
-                    // ✅ Calculate totals
-                    let total_qty = selected_batches.reduce((sum, batch) => sum + (parseFloat(batch.qty) || 0), 0);
-                    let qty_in_rolls = selected_batches.length;
-                    let batch_nos = selected_batches.map(batch => batch.batch_no).join('\n');
-                    let warehouses = [...new Set(selected_batches.map(batch => batch.warehouse))].join('\n');
+                        frappe.model.set_value(cdt, cdn, 'qty_in_kgs', total_qty);
+                        frappe.model.set_value(cdt, cdn, 'qty_in_rolls', qty_in_rolls);
+                        frappe.model.set_value(cdt, cdn, 'batches', batch_nos);
+                        frappe.model.set_value(cdt, cdn, 'warehouse', warehouses);
 
-                    frappe.model.set_value(cdt, cdn, 'qty_in_kgs', total_qty);
-                    frappe.model.set_value(cdt, cdn, 'qty_in_rolls', qty_in_rolls);
-                    frappe.model.set_value(cdt, cdn, 'batches', batch_nos);
-                    frappe.model.set_value(cdt, cdn, 'warehouse', warehouses);
+                        // Add into child table
+                        frappe.call({
+                            method: "frappe.client.get",
+                            args: {
+                                doctype: "Item",
+                                name: row.item
+                            },
+                            callback: function(r) {
+                                let item_doc = r.message;
 
-                    frm.refresh_field('custom_multiple_batch_items');
-                    selected_batches.forEach(item => {
-                        let r = frm.add_child('items');
-                        frappe.model.set_value(r.doctype, r.name, 'item_code', row.item);
-                        frappe.model.set_value(r.doctype, r.name, 'batch_no', item.batch_no);
-                        frappe.model.set_value(r.doctype, r.name, 'warehouse', item.warehouse);
-                        frappe.model.set_value(r.doctype, r.name, 'qty', item.qty);
-                    });
+                                selected_batches.forEach(b => {
+                                    let child = frappe.model.add_child(frm.doc, "items");
+                                    child.item_code = row.item;
+                                    child.qty = b.qty;
+                                    child.batch_no = b.batch_no;
+                                    child.warehouse = b.warehouse;
+                                    child.item_name = item_doc.item_name;
+                                    child.uom = item_doc.stock_uom;
+                                    child.stock_uom = item_doc.stock_uom;
+                                    child.conversion_factor = 1;
+                                });
 
-                    frm.refresh_field('items');
-                    d.hide();
-                    }
-                });
+                                frm.refresh_field("items");
+                            }
+                        });
 
-                d.selected_batches = [];
-
-                // Handle row click event
-                d.$wrapper.on('click', '.grid-row', function() {
-                    const idx = parseInt($(this).attr('data-idx'));
-                    const row = d.fields_dict.batch_table.grid.data[idx - 1];
-
-                    if (!row) return;
-
-                    // Toggle selection manually
-                    let selected_rows = d.fields_dict.batch_table.grid.get_selected();
-                    if (selected_rows.includes(row)) {
-                        // already selected → unselect
-                        d.fields_dict.batch_table.grid.unselect_row(row);
-                    } else {
-                        d.fields_dict.batch_table.grid.select_row(row);
+                        d.hide();
                     }
                 });
 
-                // 🔍 Apply filters (maintains selected rows)
+                // keep track of selected names (keyed by unique name)
+                d.selected_names = {}; // { name: true }
+
+                // helper to find master row by name
+                function findMasterByName(name) {
+                    for (let i = 0; i < master_table_data.length; i++) {
+                        if (master_table_data[i].name === name) return master_table_data[i];
+                    }
+                    return null;
+                }
+
+                // render filtered grid from master_table_data
                 function apply_filters() {
                     const search = (d.get_value('search_batch') || '').toLowerCase();
-                    const warehouse_filter = d.get_value('filter_warehouse');
-                    const selected_before = d.fields_dict.batch_table.grid.get_selected().map(r => r.batch_no);
+                    const wh = d.get_value('filter_warehouse');
 
-                    const filtered = table_data.filter(row => {
-                        const matchSearch =
-                            !search ||
-                            row.batch_no.toLowerCase().includes(search) ||
-                            String(row.qty).toLowerCase().includes(search);
-                        const matchWarehouse =
-                            warehouse_filter === 'All' || row.warehouse === warehouse_filter;
-                        return matchSearch && matchWarehouse;
-                    });
+                    // Build filtered view from master_table_data
+                    let filtered = master_table_data
+                        .filter(m => {
+                            const matchSearch =
+                                !search ||
+                                (m.batch_no || '').toLowerCase().includes(search) ||
+                                String(m.qty || '').includes(search);
 
-                    // Restore previous selections
-                    filtered.forEach(row => {
-                        if (selected_before.includes(row.batch_no)) {
-                            row.__checked = true;
-                        }
-                    });
+                            const matchWarehouse =
+                                wh === 'All' || m.warehouse === wh;
+
+                            return matchSearch && matchWarehouse;
+                        })
+                        .map(m => {
+                            return {
+                                name: m.name,
+                                batch_no: m.batch_no,
+                                warehouse: m.warehouse,
+                                qty: m.qty,
+                                
+                                __checked: m.selected ? 1 : 0
+                            };
+                        });
 
                     d.fields_dict.batch_table.grid.df.data = filtered;
                     d.fields_dict.batch_table.grid.refresh();
+
+                    // Re-apply highlight on rendered rows
+                    setTimeout(() => {
+                        d.$wrapper.find('.grid-row').each(function () {
+                            const idx = parseInt($(this).attr('data-idx'));
+                            const shown_row = d.fields_dict.batch_table.grid.data[idx - 1];
+
+                            if (!shown_row) return;
+
+                            const master = master_table_data.find(m => m.name === shown_row.name);
+
+                            if (master && master.selected) {
+                                $(this).addClass('my-selected-row');
+                            } else {
+                                $(this).removeClass('my-selected-row');
+                            }
+                        });
+                    }, 30);
                 }
+
+
+                // add / remove visual highlight on currently rendered grid rows
+                function restore_row_highlights() {
+                    // iterate visible .grid-row elements
+                    d.$wrapper.find('.grid-row').each(function () {
+                        const $gr = $(this);
+                        const idx = parseInt($gr.attr('data-idx'));
+                        // grid.data is 0-based and corresponds to currently shown rows
+                        const shown_row = d.fields_dict.batch_table.grid.data[idx - 1];
+                        if (!shown_row) return;
+
+                        const master = findMasterByName(shown_row.name);
+                        if (master && master.selected) {
+                            $gr.addClass('my-selected-row');
+                        } else {
+                            $gr.removeClass('my-selected-row');
+                        }
+                    });
+                }
+
+                // Unbind previous handlers to avoid duplicates if dialog is re-opened
+                d.$wrapper.off('click', '.grid-row');
+
+                // row click toggles selection in master_table_data (no extra checkbox)
+                d.$wrapper.on('click', '.grid-row', function (e) {
+                    // prevent toggling when clicking on some internal input if any
+                    // but allow general row clicks
+                    let $gr = $(this);
+                    const idx = parseInt($gr.attr('data-idx'));
+                    const shown_row = d.fields_dict.batch_table.grid.data[idx - 1];
+                    if (!shown_row) return;
+
+                    let master = findMasterByName(shown_row.name);
+                    if (!master) return;
+
+                    // toggle
+                    master.selected = !master.selected;
+
+                    // reflect immediate highlight change on this DOM row
+                    if (master.selected) {
+                        $gr.addClass('my-selected-row');
+                    } else {
+                        $gr.removeClass('my-selected-row');
+                    }
+
+                    // keep selected_names for debugging / quick access
+                    if (master.selected) {
+                        d.selected_names[master.name] = true;
+                    } else {
+                        delete d.selected_names[master.name];
+                    }
+                });
+
+                // initial render
+                apply_filters();
 
                 d.show();
             }
