@@ -162,7 +162,7 @@ class StockBalanceReport:
 		_system_settings = frappe.get_cached_doc("System Settings")
 		with frappe.db.unbuffered_cursor():
 			if not self.filters.get("show_stock_ageing_data"):
-				self.sle_entries = self.sle_query.run(as_dict=True, as_iterator=True)
+				self.sle_entries = self.sle_query.run(as_dict=True)
 
 			for entry in self.sle_entries:
 				group_by_key = self.get_group_by_key(entry)
@@ -208,18 +208,24 @@ class StockBalanceReport:
 
 		value_diff = flt(entry.stock_value_difference)
 
-		# --- NEW: Track rolls (batch-based counts) ---
+		# --- NEW: Track rolls ---
 		in_roll = 0.0
 		out_roll = 0.0
 
-		if entry.serial_and_batch_bundle:		
-			if entry.voucher_type in ["Purchase Receipt", "Stock Entry"] and qty_diff > 0:
-				in_roll = 1.0
-			# Count rolls for Delivery Note (out)
-			elif entry.voucher_type in ["Delivery Note", "Stock Entry"] and qty_diff < 0:
-				out_roll = 1.0
+		# Roll calculation only when bundle exists
+		if entry.serial_and_batch_bundle:
 
-		# --- existing logic ---
+			# get batch rows inside bundle  → 1 batch = 1 roll
+			roll_rows = frappe.get_all("Serial and Batch Entry",filters={"parent": entry.serial_and_batch_bundle},fields=["batch_no"])
+			rolls = len(roll_rows)
+			# Incoming rolls
+			if entry.voucher_type in ["Purchase Receipt", "Stock Entry"] and qty_diff > 0:
+				in_roll = rolls
+
+			# Outgoing rolls
+			elif entry.voucher_type in ["Delivery Note", "Stock Entry"] and qty_diff < 0:
+				out_roll = rolls
+
 		if entry.posting_date < self.from_date or entry.voucher_no in self.opening_vouchers.get(
 			entry.voucher_type, []
 		):
