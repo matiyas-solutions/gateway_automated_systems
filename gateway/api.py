@@ -3,45 +3,30 @@ from frappe.utils import flt, cint
 
 @frappe.whitelist()
 def get_batch_details(item_code):
-    results = []
+    """
+    Get current available batch stock per warehouse.
+    Works for Purchase Receipt, Material Transfer, Repack, etc.
+    """
 
-    # Step 1: Get all parent docs of the given item with batch info
-    parent_names = frappe.db.get_list(
-        "Serial and Batch Bundle",
-        filters={
-            "item_code": item_code,
-            "type_of_transaction": "Inward",
-            "has_batch_no": 1
-        },
-        pluck="name",
-        order_by="creation asc"
-    )
-
-    if not parent_names:
-        return results
-
-    # Step 2: Get all child entries with qty > 0
-    child_entries = frappe.db.get_all(
-        "Serial and Batch Entry",
-        filters={
-            "parent": ["in", parent_names],
-            "qty": [">", 0]
-        },
-        fields=["batch_no", "qty", "warehouse", "creation"],
-        order_by="creation asc"
-    )
-
-    # Step 3: Include only batches that exist and have batch_qty > 0
-    for entry in child_entries:
-        batch = frappe.db.get_value("Batch", entry.batch_no, ["batch_qty"], as_dict=True)
-        if batch and batch.batch_qty > 0:
-            results.append({
-                "batch_no": entry.batch_no,
-                "qty": entry.qty,
-                "warehouse": entry.warehouse
-            })
-
-    return results
+    return frappe.db.sql("""
+        SELECT
+            sle.batch_no,
+            sle.warehouse,
+            SUM(sle.actual_qty) AS qty
+        FROM `tabStock Ledger Entry` sle
+        WHERE
+            sle.item_code = %(item_code)s
+            AND sle.batch_no IS NOT NULL
+            AND sle.is_cancelled = 0
+        GROUP BY
+            sle.batch_no,
+            sle.warehouse
+        HAVING
+            qty > 0
+        ORDER BY
+            sle.warehouse,
+            sle.batch_no
+    """, {"item_code": item_code}, as_dict=True)
 
 @frappe.whitelist()
 def set_item_batch_details(item, selected_batches, doc):

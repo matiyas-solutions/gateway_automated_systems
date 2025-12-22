@@ -1,0 +1,66 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-12-22 17:43:23.800267",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "qty_in_kgs",
+  "batches",
+  "column_break_zkse",
+  "qty_in_rolls",
+  "warehouse"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item"
+  },
+  {
+   "fieldname": "qty_in_kgs",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty In Kgs"
+  },
+  {
+   "fieldname": "batches",
+   "fieldtype": "Small Text",
+   "label": "Batches"
+  },
+  {
+   "fieldname": "column_break_zkse",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qty_in_rolls",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty In Rolls"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Small Text",
+   "label": "Warehouse"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-12-22 17:45:24.942928",
+ "modified_by": "Administrator",
+ "module": "Gateway",
+ "name": "Select Multiple Batch",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
