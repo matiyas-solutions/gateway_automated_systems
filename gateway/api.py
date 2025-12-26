@@ -4,28 +4,32 @@ from frappe.utils import flt, cint
 @frappe.whitelist()
 def get_batch_details(item_code):
     """
-    Get current available batch stock per warehouse.
-    Works for Purchase Receipt, Material Transfer, Repack, etc.
+    Get current available batch stock per warehouse
+    using Serial and Batch Bundle (ERPNext v15+)
     """
 
     return frappe.db.sql("""
         SELECT
-            sle.batch_no,
+            sbi.batch_no,
             sle.warehouse,
-            SUM(sle.actual_qty) AS qty
+            SUM(sbi.qty) AS qty
         FROM `tabStock Ledger Entry` sle
+        INNER JOIN `tabSerial and Batch Bundle` sbb
+            ON sbb.name = sle.serial_and_batch_bundle
+        INNER JOIN `tabSerial and Batch Entry` sbi
+            ON sbi.parent = sbb.name
         WHERE
             sle.item_code = %(item_code)s
-            AND sle.batch_no IS NOT NULL
             AND sle.is_cancelled = 0
+            AND sbi.batch_no IS NOT NULL
         GROUP BY
-            sle.batch_no,
+            sbi.batch_no,
             sle.warehouse
         HAVING
             qty > 0
         ORDER BY
             sle.warehouse,
-            sle.batch_no
+            sbi.batch_no
     """, {"item_code": item_code}, as_dict=True)
 
 @frappe.whitelist()

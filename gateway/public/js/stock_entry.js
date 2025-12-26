@@ -140,7 +140,7 @@ frappe.ui.form.on("Select Multiple Batch", {
                             callback(res) {
                                 let item = res.message;
 
-                                selected.forEach(b => {
+                                selected_batches.forEach(b => {
                                     let child = frappe.model.add_child(frm.doc, "items");
                                     child.item_code = row.item_code;
                                     child.batch_no = b.batch_no;
